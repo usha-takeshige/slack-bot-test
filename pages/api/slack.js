@@ -19,34 +19,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    // リクエストボディを文字列として取得
-    let body = '';
-    if (typeof req.body === 'string') {
-      body = req.body;
-    } else if (typeof req.body === 'object') {
-      body = JSON.stringify(req.body);
-    }
-
-    // JSONパース
-    let parsedBody;
-    try {
-      parsedBody = JSON.parse(body);
-    } catch (e) {
-      parsedBody = req.body;
-    }
-
     console.log('Received request:', {
       method: req.method,
       headers: req.headers,
-      body: parsedBody
+      body: req.body
     });
 
-    const { type, challenge, event } = parsedBody;
+    // req.bodyは既にNext.jsによってパース済み
+    const { type, challenge, event } = req.body;
 
     // URL検証（Slack appの初期設定時）
     if (type === 'url_verification') {
       console.log('URL verification request received, challenge:', challenge);
-      return res.status(200).json({ challenge });
+      
+      // Slack APIドキュメントに従ってプレーンテキストで応答
+      res.setHeader('Content-Type', 'text/plain');
+      return res.status(200).send(challenge);
     }
 
     // イベントの処理
