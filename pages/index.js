@@ -20,11 +20,17 @@ export default function Home() {
       endpoint: '/api/slack',
       method: 'POST',
       description: 'Slack Events API - app_mentionやmessage.imイベントをシミュレート'
+    },
+    slackChallenge: {
+      name: 'Slack Challenge',
+      endpoint: '/api/slack',
+      method: 'POST',
+      description: 'Slack URL検証チャレンジ - 初回セットアップ時のURL検証をテスト'
     }
   };
 
   const sendMessage = async () => {
-    if (!message.trim()) {
+    if (!message.trim() && selectedApi !== 'slackChallenge') {
       alert('メッセージを入力してください');
       return;
     }
@@ -49,6 +55,13 @@ export default function Home() {
             channel: 'C123456789',
             ts: '1234567890.123456'
           }
+        };
+      } else if (selectedApi === 'slackChallenge') {
+        // Slack Challenge用のデータをシミュレート
+        requestBody = {
+          token: 'verification_token_example',
+          challenge: message || 'challenge_code_12345',
+          type: 'url_verification'
         };
       }
 
@@ -80,18 +93,25 @@ export default function Home() {
         status: res.status,
         statusText: res.statusText,
         responseTime: responseTime,
-        success: res.ok
+        success: res.ok,
+        headers: Object.fromEntries(res.headers.entries())
       };
 
       setTestHistory(prev => [testResult, ...prev.slice(0, 9)]); // 最新10件を保持
       
       if (res.ok) {
         if (selectedApi === 'greeting' && data.output) {
-          setResponse(data.output);
+          setResponse(`✅ ${data.output}`);
         } else if (selectedApi === 'slack') {
           setResponse(data === 'OK' ? '✅ Slackイベントが正常に処理されました' : data);
+        } else if (selectedApi === 'slackChallenge') {
+          if (data === requestBody.challenge) {
+            setResponse(`✅ チャレンジ検証成功！ 返答: "${data}"`);
+          } else {
+            setResponse(`❌ チャレンジ検証失敗。期待値: "${requestBody.challenge}", 実際: "${data}"`);
+          }
         } else {
-          setResponse(JSON.stringify(data, null, 2));
+          setResponse(`✅ レスポンス: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
         }
       } else {
         setResponse(`❌ エラー: ${res.status} ${res.statusText}`);
@@ -123,12 +143,19 @@ export default function Home() {
   };
 
   const testPresets = [
-    { label: 'おはよう', value: 'おはよう' },
-    { label: 'hello', value: 'hello' },
-    { label: 'こんにちは', value: 'こんにちは' },
-    { label: 'good morning', value: 'good morning' },
-    { label: 'テストメッセージ', value: 'テストメッセージ' }
+    { label: 'おはよう', value: 'おはよう', apis: ['greeting', 'slack'] },
+    { label: 'hello', value: 'hello', apis: ['greeting', 'slack'] },
+    { label: 'こんにちは', value: 'こんにちは', apis: ['greeting', 'slack'] },
+    { label: 'good morning', value: 'good morning', apis: ['greeting', 'slack'] },
+    { label: 'テストメッセージ', value: 'テストメッセージ', apis: ['greeting', 'slack'] },
+    { label: 'チャレンジコード例', value: 'challenge_code_12345', apis: ['slackChallenge'] },
+    { label: 'ランダムチャレンジ', value: `challenge_${Math.random().toString(36).substring(7)}`, apis: ['slackChallenge'] }
   ];
+
+  // 現在のAPIに適用可能なプリセットのみを表示
+  const availablePresets = testPresets.filter(preset => 
+    preset.apis.includes(selectedApi)
+  );
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
@@ -157,7 +184,10 @@ export default function Home() {
           </label>
           <select 
             value={selectedApi} 
-            onChange={(e) => setSelectedApi(e.target.value)}
+            onChange={(e) => {
+              setSelectedApi(e.target.value);
+              setMessage(''); // APIが変わったらメッセージをクリア
+            }}
             style={{ padding: '8px', marginRight: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
             {Object.entries(apiEndpoints).map(([key, api]) => (
@@ -169,42 +199,67 @@ export default function Home() {
           </span>
         </div>
 
-        {/* プリセットメッセージ */}
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
-            プリセットメッセージ:
-          </label>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {testPresets.map((preset, index) => (
-              <button
-                key={index}
-                onClick={() => setMessage(preset.value)}
-                style={{
-                  padding: '5px 10px',
-                  backgroundColor: '#e0e0e0',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
+        {/* 特別な説明（Challenge API用） */}
+        {selectedApi === 'slackChallenge' && (
+          <div style={{ 
+            marginBottom: '20px', 
+            padding: '15px', 
+            backgroundColor: '#fff3cd', 
+            borderRadius: '5px',
+            border: '1px solid #ffeaa7'
+          }}>
+            <h4>📝 チャレンジテストについて</h4>
+            <p>SlackのURL検証プロセスをシミュレートします。</p>
+            <ul>
+              <li>Slackは初回セットアップ時に、指定されたRequest URLに<code>challenge</code>パラメータを送信</li>
+              <li>アプリは同じ<code>challenge</code>値をプレーンテキストで返す必要があります</li>
+              <li>これによりSlackがURL所有権を確認します</li>
+            </ul>
           </div>
-        </div>
+        )}
+
+        {/* プリセットメッセージ */}
+        {availablePresets.length > 0 && (
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+              プリセット{selectedApi === 'slackChallenge' ? 'チャレンジコード' : 'メッセージ'}:
+            </label>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {availablePresets.map((preset, index) => (
+                <button
+                  key={index}
+                  onClick={() => setMessage(preset.value)}
+                  style={{
+                    padding: '5px 10px',
+                    backgroundColor: '#e0e0e0',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* メッセージ入力 */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
-            テストメッセージ:
+            {selectedApi === 'slackChallenge' ? 'チャレンジコード:' : 'テストメッセージ:'}
           </label>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="メッセージを入力してください（例：おはよう、hello）"
+              placeholder={
+                selectedApi === 'slackChallenge' 
+                  ? "チャレンジコードを入力（例：challenge_code_12345）" 
+                  : "メッセージを入力してください（例：おはよう、hello）"
+              }
               style={{ 
                 padding: '10px', 
                 width: '400px', 
@@ -237,10 +292,11 @@ export default function Home() {
             padding: '15px', 
             backgroundColor: response.includes('❌') ? '#ffe6e6' : '#e8f5e8', 
             borderRadius: '5px',
-            marginBottom: '20px'
+            marginBottom: '20px',
+            border: response.includes('❌') ? '1px solid #ff9999' : '1px solid #99cc99'
           }}>
-            <strong>応答:</strong> 
-            <div style={{ marginTop: '5px', fontFamily: 'monospace' }}>
+            <strong>🔄 APIレスポンス:</strong> 
+            <div style={{ marginTop: '5px', fontFamily: 'monospace', fontSize: '14px' }}>
               {response}
             </div>
           </div>
@@ -257,10 +313,26 @@ export default function Home() {
           }}>
             <h4>📊 レスポンス詳細</h4>
             <div style={{ fontSize: '14px', fontFamily: 'monospace' }}>
-              <p><strong>ステータス:</strong> {responseDetails.status} {responseDetails.statusText}</p>
+              <p><strong>ステータス:</strong> 
+                <span style={{ 
+                  color: responseDetails.success ? 'green' : 'red',
+                  fontWeight: 'bold'
+                }}>
+                  {responseDetails.status} {responseDetails.statusText}
+                </span>
+              </p>
               <p><strong>応答時間:</strong> {responseDetails.responseTime}ms</p>
               <p><strong>タイムスタンプ:</strong> {new Date(responseDetails.timestamp).toLocaleString()}</p>
               <p><strong>API:</strong> {apiEndpoints[responseDetails.api].name}</p>
+              
+              {responseDetails.headers && (
+                <details style={{ marginTop: '10px' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>レスポンスヘッダー</summary>
+                  <pre style={{ backgroundColor: '#f0f0f0', padding: '10px', borderRadius: '4px', overflow: 'auto' }}>
+                    {JSON.stringify(responseDetails.headers, null, 2)}
+                  </pre>
+                </details>
+              )}
               
               <details style={{ marginTop: '10px' }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>リクエスト詳細</summary>
@@ -272,7 +344,9 @@ export default function Home() {
               <details style={{ marginTop: '10px' }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>レスポンス詳細</summary>
                 <pre style={{ backgroundColor: '#f0f0f0', padding: '10px', borderRadius: '4px', overflow: 'auto' }}>
-                  {JSON.stringify(responseDetails.response, null, 2)}
+                  {typeof responseDetails.response === 'string' 
+                    ? responseDetails.response 
+                    : JSON.stringify(responseDetails.response, null, 2)}
                 </pre>
               </details>
             </div>
