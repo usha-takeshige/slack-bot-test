@@ -46,16 +46,28 @@ export default function Home() {
       if (selectedApi === 'greeting') {
         requestBody = { message };
       } else if (selectedApi === 'slack') {
-        // Slack API用のイベントデータをシミュレート
-        requestBody = {
-          event: {
-            type: 'app_mention',
-            text: `<@U123456789> ${message}`,
-            user: 'U123456789',
-            channel: 'C123456789',
-            ts: '1234567890.123456'
-          }
-        };
+        // チャレンジコードの検出（challenge_で始まる場合）
+        const isChallengeTest = message.startsWith('challenge_') || message === 'challenge_code_12345';
+        
+        if (isChallengeTest) {
+          // Slack Challenge用のデータをシミュレート
+          requestBody = {
+            token: 'verification_token_example',
+            challenge: message,
+            type: 'url_verification'
+          };
+        } else {
+          // 通常のSlack API用のイベントデータをシミュレート
+          requestBody = {
+            event: {
+              type: 'app_mention',
+              text: `<@U123456789> ${message}`,
+              user: 'U123456789',
+              channel: 'C123456789',
+              ts: '1234567890.123456'
+            }
+          };
+        }
       } else if (selectedApi === 'slackChallenge') {
         // Slack Challenge用のデータをシミュレート
         requestBody = {
@@ -103,7 +115,18 @@ export default function Home() {
         if (selectedApi === 'greeting' && data.output) {
           setResponse(`✅ ${data.output}`);
         } else if (selectedApi === 'slack') {
-          setResponse(data === 'OK' ? '✅ Slackイベントが正常に処理されました' : data);
+          // チャレンジテストの判定
+          const isChallengeTest = requestBody.challenge !== undefined;
+          
+          if (isChallengeTest) {
+            if (data === requestBody.challenge) {
+              setResponse(`✅ チャレンジ検証成功！ 返答: "${data}"`);
+            } else {
+              setResponse(`❌ チャレンジ検証失敗。期待値: "${requestBody.challenge}", 実際: "${data}"`);
+            }
+          } else {
+            setResponse(data === 'OK' ? '✅ Slackイベントが正常に処理されました' : data);
+          }
         } else if (selectedApi === 'slackChallenge') {
           if (data === requestBody.challenge) {
             setResponse(`✅ チャレンジ検証成功！ 返答: "${data}"`);
@@ -142,18 +165,18 @@ export default function Home() {
     setResponseDetails(null);
   };
 
-  const testPresets = [
+  const getTestPresets = () => [
     { label: 'おはよう', value: 'おはよう', apis: ['greeting', 'slack'] },
     { label: 'hello', value: 'hello', apis: ['greeting', 'slack'] },
     { label: 'こんにちは', value: 'こんにちは', apis: ['greeting', 'slack'] },
     { label: 'good morning', value: 'good morning', apis: ['greeting', 'slack'] },
     { label: 'テストメッセージ', value: 'テストメッセージ', apis: ['greeting', 'slack'] },
-    { label: 'チャレンジコード例', value: 'challenge_code_12345', apis: ['slackChallenge'] },
-    { label: 'ランダムチャレンジ', value: `challenge_${Math.random().toString(36).substring(7)}`, apis: ['slackChallenge'] }
+    { label: 'チャレンジコード例', value: 'challenge_code_12345', apis: ['slack', 'slackChallenge'] },
+    { label: 'ランダムチャレンジ', value: `challenge_${Math.random().toString(36).substring(7)}`, apis: ['slack', 'slackChallenge'] }
   ];
 
   // 現在のAPIに適用可能なプリセットのみを表示
-  const availablePresets = testPresets.filter(preset => 
+  const availablePresets = getTestPresets().filter(preset => 
     preset.apis.includes(selectedApi)
   );
 
