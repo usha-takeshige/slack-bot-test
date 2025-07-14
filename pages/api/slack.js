@@ -7,9 +7,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // POSTリクエストのみ受け付ける
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'POSTメソッドのみ許可されています' });
+  // POST、GETリクエストを受け付ける
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({ error: 'POSTまたはGETメソッドのみ許可されています' });
   }
 
   try {
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       body: req.body
     });
 
-    const data = req.body;
+    const data = req.method === 'GET' ? req.query : req.body;
     
     // URL検証チャレンジ（初回設定時のみ）
     if (data.challenge) {
