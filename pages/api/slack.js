@@ -7,10 +7,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  // POST、GETリクエストを受け付ける
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(405).json({ error: 'POSTまたはGETメソッドのみ許可されています' });
-  }
+  // 全てのHTTPメソッドを受け付ける
+  // メソッドチェックを削除
 
   try {
     console.log('Received request:', {
