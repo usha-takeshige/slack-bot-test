@@ -22,3 +22,5 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+gas.txt
